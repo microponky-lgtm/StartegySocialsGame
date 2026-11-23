@@ -1,0 +1,1807 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070a19">
+<title>Live Quiz Studio · Interactive Buzzer Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<style>
+:root{
+  --bg:#070a19;
+  --surface:rgba(17,24,49,.82);
+  --surface-strong:rgba(20,29,58,.95);
+  --line:rgba(255,255,255,.12);
+  --line-strong:rgba(255,255,255,.22);
+  --text:#f7f9ff;
+  --muted:#9aa8cb;
+  --accent:#6366f1;
+  --accent2:#ec4899;
+  --cyan:#22d3ee;
+  --gold:#fbbf24;
+  --green:#10b981;
+  --red:#f43f5e;
+  --shadow:0 24px 70px rgba(0,0,0,.5);
+  --radius:22px;
+}
+body[data-theme="corporate"]{--accent:#0091da;--accent2:#7213ea;--cyan:#00b8a9;--bg:#040b24}
+body[data-theme="sunset"]{--accent:#f97316;--accent2:#ec4899;--cyan:#fbbf24;--bg:#120816}
+body[data-theme="emerald"]{--accent:#10b981;--accent2:#06b6d4;--cyan:#a3e635;--bg:#051414}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden;position:relative}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+
+/* Animated Ambient Stage */
+.ambient{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.ambient::after{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.045) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse at center,black 40%,transparent 85%)}
+.orb{position:absolute;border-radius:50%;filter:blur(95px);opacity:.26;will-change:transform;animation:orbFloat 16s ease-in-out infinite alternate}
+.orb.a{width:44vmax;height:44vmax;background:var(--accent);left:-12%;top:-12%}
+.orb.b{width:38vmax;height:38vmax;background:var(--accent2);right:-10%;top:22%;animation-delay:-6s}
+.orb.c{width:36vmax;height:36vmax;background:var(--cyan);left:28%;bottom:-22%;animation-delay:-11s;opacity:.18}
+@keyframes orbFloat{to{transform:translate(6vmax,-4vmax) scale(1.18)}}
+
+/* Demo Preview Ribbon */
+.demo-bar{position:sticky;top:0;z-index:50;background:linear-gradient(90deg,rgba(15,23,42,.95),rgba(30,27,75,.95));border-bottom:1px solid rgba(99,102,241,.4);backdrop-filter:blur(14px);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.demo-badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#c7d2fe}
+.demo-badge i{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+.demo-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.demo-tab{padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#e2e8f0;transition:.18s}
+.demo-tab:hover{background:rgba(255,255,255,.16)}
+.demo-tab.active{background:linear-gradient(120deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(99,102,241,.4)}
+
+/* Main Shell */
+#app{position:relative;z-index:1;min-height:100svh}
+.shell{width:min(1260px,100%);margin:0 auto;padding:20px 22px 44px}
+.projector .shell{width:min(1560px,100%);padding:18px 34px 32px}
+
+/* Top Bar */
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 10px 28px rgba(99,102,241,.38);flex-shrink:0}
+.brand-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em;line-height:1.1}
+.brand-sub{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.top-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--text);transition:.18s}
+.pill-btn:hover{background:rgba(255,255,255,.14);border-color:var(--line-strong)}
+.live-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:99px;background:rgba(244,63,94,.14);border:1px solid rgba(244,63,94,.4);color:#fda4af;font-size:11px;font-weight:800;letter-spacing:.14em}
+.live-pill i{width:7px;height:7px;border-radius:50%;background:var(--red);animation:livePulse 1.4s infinite}
+@keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(244,63,94,.7)}70%{box-shadow:0 0 0 9px rgba(244,63,94,0)}100%{box-shadow:0 0 0 0 rgba(244,63,94,0)}}
+
+/* Cards & Typography */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan)}
+.grad-text{background:linear-gradient(100deg,#fff 12%,var(--cyan) 52%,#c4b5fd 88%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.h1-hero{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(34px,5.6vw,68px);line-height:1.02;letter-spacing:-.04em;margin:12px 0}
+.h2-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(20px,2.4vw,26px);letter-spacing:-.02em}
+.muted{color:var(--muted)}
+.tiny{font-size:12.5px;color:var(--muted)}
+
+/* Inputs & Buttons */
+.field-label{display:block;font-size:12px;font-weight:700;color:#cbd5e1;margin:12px 0 5px;letter-spacing:.03em}
+.field{width:100%;background:rgba(6,10,26,.72);border:1px solid var(--line-strong);color:#fff;border-radius:14px;padding:13px 15px;font-size:15px;outline:none;transition:.18s}
+.field:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(34,211,238,.18)}
+.code-input{text-transform:uppercase;letter-spacing:.22em;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;text-align:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 22px;border-radius:14px;font-weight:800;font-size:15px;color:#fff;background:linear-gradient(115deg,var(--accent),var(--accent2));box-shadow:0 10px 28px rgba(99,102,241,.35);transition:transform .16s,filter .16s,box-shadow .16s}
+.btn:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-2px)}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.4)}
+.btn.secondary{background:rgba(255,255,255,.08);border:1px solid var(--line-strong);box-shadow:none}
+.btn.green{background:linear-gradient(115deg,#059669,#10b981);box-shadow:0 10px 28px rgba(16,185,129,.35)}
+.btn.red{background:linear-gradient(115deg,#e11d48,#f43f5e);box-shadow:0 10px 28px rgba(244,63,94,.35)}
+.btn.gold{background:linear-gradient(115deg,#d97706,#fbbf24);color:#1f1302;box-shadow:0 10px 28px rgba(251,191,36,.35)}
+.btn.full{width:100%}
+.btn.sm{padding:9px 14px;font-size:13px;border-radius:11px}
+
+/* Player Join Screen */
+.join-wrap{max-width:480px;margin:4vh auto 0;text-align:center}
+.avatar-picker{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0 6px}
+.avatar-opt{width:42px;height:42px;border-radius:13px;font-size:20px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:2px solid transparent;transition:.16s}
+.avatar-opt:hover{transform:scale(1.1);background:rgba(255,255,255,.12)}
+.avatar-opt.selected{border-color:var(--cyan);background:rgba(34,211,238,.18);transform:scale(1.12)}
+
+/* Host Setup Form */
+.setup-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+.form-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dropzone{display:block;border:2px dashed rgba(255,255,255,.22);border-radius:18px;padding:24px 16px;text-align:center;background:rgba(255,255,255,.03);transition:.2s;cursor:pointer;margin:12px 0}
+.dropzone:hover,.dropzone.drag{border-color:var(--cyan);background:rgba(34,211,238,.08)}
+.q-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;max-height:480px;overflow-y:auto;padding-right:4px}
+.q-item{display:grid;grid-template-columns:84px 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.q-thumb{width:84px;height:64px;border-radius:11px;object-fit:cover;background:#040712;border:1px solid var(--line)}
+.q-tools{display:flex;flex-direction:column;gap:5px}
+.icon-btn{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:13px;transition:.15s}
+.icon-btn:hover{background:rgba(255,255,255,.18)}
+.icon-btn.del:hover{background:rgba(244,63,94,.3);color:#fda4af}
+.theme-dots{display:flex;gap:10px;margin-top:8px}
+.theme-dot{width:34px;height:34px;border-radius:50%;border:3px solid transparent;transition:.16s}
+.theme-dot.active{border-color:#fff;transform:scale(1.12)}
+.link-box{background:rgba(6,10,26,.7);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.link-url{font-size:12px;font-family:ui-monospace,monospace;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Lobby Stage */
+.lobby-grid{display:grid;grid-template-columns:360px 1fr;gap:24px;align-items:start}
+.qr-card{text-align:center}
+.qr-frame{width:196px;height:196px;border-radius:18px;background:#fff;padding:12px;margin:14px auto;display:grid;place-items:center;box-shadow:0 16px 40px rgba(0,0,0,.4)}
+.qr-frame img,.qr-frame canvas{max-width:100%;max-height:100%}
+.room-code-big{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(40px,5.2vw,62px);letter-spacing:.2em;color:var(--gold);text-shadow:0 0 36px rgba(251,191,36,.45);margin:6px 0}
+.player-cloud{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px;min-height:160px;align-content:flex-start}
+.player-chip{display:inline-flex;align-items:center;gap:10px;padding:11px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,.11),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.player-chip.pop-in{animation:chipPop .55s cubic-bezier(.22,1.5,.36,1) both}
+@keyframes chipPop{0%{opacity:0;transform:scale(.45) translateY(24px)}65%{opacity:1;transform:scale(1.07) translateY(-3px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.chip-avatar{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.chip-name{font-weight:700;font-size:16px}
+.chip-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.chip-dot.off{background:#64748b}
+.prize-banner{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:16px;background:linear-gradient(120deg,rgba(251,191,36,.15),rgba(99,102,241,.14));border:1px solid rgba(251,191,36,.32);margin-top:16px}
+
+/* Question & Presentation Stage */
+.q-progress-wrap{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.q-progress{flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.q-progress>i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--accent),var(--accent2));transition:width .5s cubic-bezier(.2,1,.3,1)}
+.stage-card{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:66vh;justify-content:center;position:relative}
+.q-prompt-text{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(22px,3vw,34px);margin-bottom:16px;max-width:860px}
+.q-image-frame{position:relative;display:inline-flex;align-items:center;justify-content:center;border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.2);box-shadow:0 28px 80px rgba(0,0,0,.6);background:#050814;max-width:min(880px,95%)}
+.q-image{display:block;max-width:100%;max-height:50vh;object-fit:contain;animation:imgReveal .6s cubic-bezier(.2,1.18,.4,1)}
+.projector .q-image{max-height:58vh}
+@keyframes imgReveal{from{opacity:0;transform:scale(.9) translateY(20px)}to{opacity:1;transform:none}}
+
+/* Buzzer Spotlight Banner */
+.buzz-spotlight{margin-top:20px;padding:16px 28px;border-radius:20px;background:linear-gradient(120deg,rgba(251,191,36,.22),rgba(236,72,153,.18));border:2px solid rgba(251,191,36,.65);box-shadow:0 0 50px rgba(251,191,36,.28);display:inline-flex;align-items:center;gap:16px;animation:spotlightPop .5s cubic-bezier(.2,1.45,.35,1)}
+@keyframes spotlightPop{0%{opacity:0;transform:scale(.55)}70%{transform:scale(1.06)}100%{opacity:1;transform:scale(1)}}
+.buzz-spotlight-avatar{width:54px;height:54px;border-radius:16px;font-size:28px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#f97316)}
+.buzz-spotlight-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(26px,4vw,46px);color:var(--gold);line-height:1.05}
+.buzz-queue-strip{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.queue-pill{padding:6px 13px;border-radius:99px;font-size:13px;font-weight:700;background:rgba(255,255,255,.08);border:1px solid var(--line)}
+.queue-pill.out{opacity:.42;text-decoration:line-through;border-color:rgba(244,63,94,.4);color:#fda4af}
+.wrong-banner{margin-top:14px;padding:8px 18px;border-radius:99px;background:rgba(244,63,94,.16);border:1px solid rgba(244,63,94,.45);color:#fda4af;font-weight:800;font-size:14px;animation:shake .45s ease}
+@keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
+/* Host Action Bar */
+.host-dock{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;margin-top:20px;padding:12px 16px;border-radius:18px;background:rgba(9,14,34,.75);border:1px solid var(--line)}
+.answer-peek{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:13px;font-weight:700}
+
+/* Phone Player Buzzer */
+.phone-stage{max-width:460px;margin:2vh auto 0;text-align:center}
+.buzz-btn-wrap{position:relative;display:inline-grid;place-items:center;margin:26px auto}
+.buzz-ring{position:absolute;inset:-16px;border-radius:50%;border:3px solid rgba(244,63,94,.45);animation:ringExpand 1.8s ease-out infinite;pointer-events:none}
+@keyframes ringExpand{0%{transform:scale(.92);opacity:.8}100%{transform:scale(1.22);opacity:0}}
+.big-buzzer{position:relative;width:min(68vw,250px);height:min(68vw,250px);border-radius:50%;border:10px solid rgba(255,255,255,.24);background:radial-gradient(circle at 34% 26%,#ff8fa3,#f43f5e 52%,#9f1239 100%);box-shadow:0 16px 0 #700d28,0 26px 65px rgba(244,63,94,.58),inset 0 6px 18px rgba(255,255,255,.45);color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(32px,9vw,46px);letter-spacing:.06em;touch-action:manipulation;transition:transform .08s,box-shadow .08s,filter .2s}
+.big-buzzer:active:not(:disabled){transform:translateY(11px);box-shadow:0 5px 0 #700d28,0 12px 30px rgba(244,63,94,.5)}
+.big-buzzer.queued{background:radial-gradient(circle at 34% 26%,#fde68a,#f59e0b 55%,#b45309 100%);box-shadow:0 14px 0 #78350f,0 22px 55px rgba(245,158,11,.45);font-size:clamp(22px,6vw,30px)}
+.big-buzzer.first-up{background:radial-gradient(circle at 34% 26%,#6ee7b7,#10b981 55%,#047857 100%);box-shadow:0 14px 0 #064e3b,0 24px 60px rgba(16,185,129,.55);font-size:clamp(22px,6vw,30px)}
+.big-buzzer.wrong-out{background:radial-gradient(circle at 34% 26%,#94a3b8,#475569 60%,#1e293b 100%);box-shadow:0 10px 0 #0f172a;opacity:.7;font-size:clamp(20px,5.5vw,26px)}
+.big-buzzer:disabled{cursor:default}
+.big-buzzer:disabled + .buzz-ring{display:none}
+.player-mini-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid var(--line);margin-bottom:16px}
+
+/* Answer Reveal Card */
+.reveal-card{max-width:780px;width:100%;padding:34px 28px;border-radius:26px;background:linear-gradient(145deg,rgba(23,33,66,.92),rgba(13,19,40,.95));border:1px solid rgba(255,255,255,.18);box-shadow:0 30px 90px rgba(0,0,0,.6);animation:imgReveal .55s cubic-bezier(.2,1.25,.35,1)}
+.reveal-answer{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(32px,5.8vw,64px);margin:10px 0 14px;line-height:1.08}
+.reveal-winner{display:inline-flex;align-items:center;gap:10px;padding:10px 20px;border-radius:99px;background:rgba(16,185,129,.18);border:1px solid rgba(16,185,129,.5);color:#6ee7b7;font-weight:800;font-size:clamp(16px,2vw,22px)}
+
+/* Animated Up/Down Leaderboard */
+.lb-wrap{max-width:860px;margin:2vh auto;text-align:center}
+.lb-track{position:relative;width:100%;margin:26px auto 10px;transition:height .5s ease}
+.lb-row{position:absolute;left:0;right:0;height:68px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);overflow:hidden;transition:transform .9s cubic-bezier(.22,1.16,.36,1),border-color .4s,box-shadow .4s;will-change:transform}
+.lb-row.rank-1{border-color:rgba(251,191,36,.65);box-shadow:0 10px 35px rgba(251,191,36,.2)}
+.lb-row.is-me{border-color:rgba(34,211,238,.7);box-shadow:0 0 28px rgba(34,211,238,.22)}
+.lb-fill{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,rgba(99,102,241,.42),rgba(34,211,238,.22));transition:width 1s cubic-bezier(.2,1,.3,1);min-width:64px;border-radius:16px}
+.lb-row.rank-1 .lb-fill{background:linear-gradient(90deg,rgba(217,119,6,.55),rgba(251,191,36,.3))}
+.lb-content{position:relative;z-index:1;height:100%;display:grid;grid-template-columns:54px 44px 1fr auto 96px;align-items:center;gap:12px;padding:0 18px}
+.lb-rank{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;text-align:center}
+.lb-av{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:rgba(255,255,255,.12)}
+.lb-name-col{text-align:left;min-width:0}
+.lb-name{font-weight:800;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-badges{font-size:12.5px;color:var(--gold);margin-top:1px}
+.lb-delta{font-size:12px;font-weight:800;padding:4px 9px;border-radius:99px}
+.lb-delta.up{background:rgba(16,185,129,.22);color:#6ee7b7}
+.lb-delta.down{background:rgba(244,63,94,.2);color:#fda4af}
+.lb-delta.same{background:rgba(255,255,255,.08);color:var(--muted)}
+.lb-score{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:24px;text-align:right}
+.lb-score small{font-size:12px;color:var(--muted);font-weight:600}
+
+/* Podium Finale */
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;align-items:end;max-width:740px;margin:28px auto 30px}
+.pod-col{border-radius:22px 22px 14px 14px;padding:20px 14px;text-align:center;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04));animation:podRise .8s cubic-bezier(.2,1.25,.35,1) both}
+.pod-col.p1{min-height:230px;border-color:rgba(251,191,36,.65);background:linear-gradient(180deg,rgba(251,191,36,.28),rgba(99,102,241,.12));box-shadow:0 20px 60px rgba(251,191,36,.24);animation-delay:.2s}
+.pod-col.p2{min-height:185px;animation-delay:.1s}
+.pod-col.p3{min-height:160px;animation-delay:.3s}
+@keyframes podRise{from{opacity:0;transform:translateY(48px) scale(.92)}to{opacity:1;transform:none}}
+.pod-avatar{font-size:38px;margin-bottom:6px}
+.pod-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(17px,2.2vw,24px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod-pts{font-weight:800;color:var(--gold);margin-top:6px;font-size:18px}
+
+/* Modal & Toast */
+.modal-backdrop{position:fixed;inset:0;z-index:60;background:rgba(4,7,20,.84);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:18px}
+.modal-backdrop.show{display:flex}
+.modal-card{width:min(680px,100%);max-height:86vh;overflow-y:auto;background:var(--surface-strong);border:1px solid var(--line-strong);border-radius:24px;padding:26px;box-shadow:var(--shadow)}
+.toast{position:fixed;z-index:70;bottom:24px;left:50%;transform:translate(-50%,24px);background:#fff;color:#0f172a;padding:12px 20px;border-radius:14px;font-weight:800;font-size:14px;opacity:0;pointer-events:none;transition:.25s;box-shadow:0 12px 35px rgba(0,0,0,.45)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.confetti-piece{position:fixed;top:-16px;width:9px;height:14px;z-index:65;pointer-events:none;animation:cfFall 3s linear forwards}
+@keyframes cfFall{to{transform:translateY(112vh) rotate(720deg);opacity:.7}}
+
+.step-box{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0;font-size:14px;line-height:1.55}
+.step-box code{background:rgba(0,0,0,.45);padding:2px 7px;border-radius:6px;color:var(--cyan);font-size:12.5px}
+
+@media(max-width:860px){
+  .setup-grid,.lobby-grid{grid-template-columns:1fr}
+  .shell{padding:14px 14px 36px}
+  .panel{padding:18px}
+  .form-2col{grid-template-columns:1fr}
+  .lb-content{grid-template-columns:40px 34px 1fr auto 74px;gap:8px;padding:0 12px}
+  .lb-name{font-size:15px}
+  .lb-score{font-size:19px}
+  .podium{gap:8px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body data-theme="indigo">
+<div class="ambient"><i class="orb a"></i><i class="orb b"></i><i class="orb c"></i></div>
+<div id="demoBar"></div>
+<div id="app"></div>
+<div id="modal" class="modal-backdrop">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 class="h2-title" id="modalTitle">Setup Guide</h2>
+      <button class="icon-btn" id="modalCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================================
+   STEP 1: PASTE YOUR 5 FIREBASE VALUES BELOW (from Firebase Project Settings)
+   Leave as "PASTE_HERE" to test the interactive Demo Mode right now!
+   ============================================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB5ijJ7TS6fqb3CmXQ5ehYDc58u32CVjeg",
+  authDomain: "strategyquiz.firebaseapp.com",
+  databaseURL: "https://strategyquiz-default-rtdb.firebaseio.com",
+  projectId: "strategyquiz",
+  appId: "1:1039649557236:web:e26612a3364b77e82b6ca1"
+};
+
+/* Optional: Set a Host Passcode (e.g. "2026") so only you can open the Host link.
+   Leave empty "" if you don't need a passcode prompt on your Host link. */
+const OWNER_HOST_PIN = "6241";
+
+/* ============================================================================
+   CORE ENGINE (Supports both Live Firebase RTDB & Built-in Interactive Demo)
+   ============================================================================ */
+const IS_LIVE_FIREBASE = Boolean(
+  FIREBASE_CONFIG.apiKey &&
+  FIREBASE_CONFIG.apiKey !== "PASTE_HERE" &&
+  FIREBASE_CONFIG.databaseURL &&
+  FIREBASE_CONFIG.databaseURL !== "PASTE_HERE"
+);
+
+const AVATARS = ['🦊','🦁','🐼','🚀','⚡','🎯','🦄','🐯','🐙','🦉','🔥','💎'];
+const DEMO_PLAYERS_POOL = [
+  { name: 'Aarav', avatar: '🚀' },
+  { name: 'Priya', avatar: '⚡' },
+  { name: 'Rohan', avatar: '🦁' },
+  { name: 'Meera', avatar: '🦊' },
+  { name: 'Kabir', avatar: '🎯' },
+  { name: 'Ananya', avatar: '💎' }
+];
+
+function makeSvgCard(bg1, bg2, emoji, badge, sub) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${bg1}"/><stop offset="100%" stop-color="${bg2}"/></linearGradient></defs>
+    <rect width="900" height="520" rx="28" fill="url(#g)"/>
+    <circle cx="140" cy="110" r="150" fill="rgba(255,255,255,0.08)"/>
+    <circle cx="770" cy="430" r="180" fill="rgba(255,255,255,0.07)"/>
+    <rect x="330" y="54" width="240" height="40" rx="20" fill="rgba(0,0,0,0.28)"/>
+    <text x="450" y="80" font-family="sans-serif" font-size="18" font-weight="700" fill="#fde68a" text-anchor="middle" letter-spacing="3">${badge}</text>
+    <text x="450" y="290" font-size="145" text-anchor="middle">${emoji}</text>
+    <text x="450" y="425" font-family="sans-serif" font-size="30" font-weight="700" fill="#ffffff" text-anchor="middle">${sub}</text>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+const SAMPLE_QUESTIONS = [
+  { image: makeSvgCard('#1e1b4b','#4c1d95','🎬 🦁 👑','GUESS THE MOVIE','Classic Animated Masterpiece'), prompt: 'Name this iconic movie!', answer: 'The Lion King' },
+  { image: makeSvgCard('#0f172a','#0369a1','🚀 🕳️ ⏳','GUESS THE MOVIE','Sci-Fi Space Epic'), prompt: 'Buzz in if you know this film!', answer: 'Interstellar' },
+  { image: makeSvgCard('#14532d','#065f46','🦖 🌴 🚙','GUESS THE MOVIE','90s Adventure Blockbuster'), prompt: 'Fastest finger wins the points!', answer: 'Jurassic Park' }
+];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function safeGet(k, d=''){ try { return localStorage.getItem(k) ?? d; } catch(e) { return d; } }
+function safeSet(k, v){ try { localStorage.setItem(k, v); } catch(e) {} }
+
+const appEl = $('#app');
+const demoBarEl = $('#demoBar');
+let db = null;
+let role = null; // 'host' | 'player'
+let screen = 'init'; // 'join' | 'setup' | 'lobby' | 'question' | 'reveal' | 'leaderboard' | 'end'
+let roomId = '';
+let playerId = '';
+let selectedAvatar = AVATARS[0];
+let soundOn = true;
+let audioCtx = null;
+let hideHostAnswer = false;
+let hostUnlocked = !OWNER_HOST_PIN;
+let listeners = [];
+let seenState = { phase: '', activeBuzzId: '', outCount: 0, playerCount: 0, questionIndex: -1 };
+let prevRankMap = {};
+let lbRowNodes = {};
+let renderedLobbyPlayers = new Set();
+let lastScreenKey = '';
+let demoView = 'setup'; // 'setup' | 'host' | 'player'
+
+// Host Setup Form State
+let setupState = {
+  eventTitle: 'Strategy Socials',
+  tagline: 'THE LIVE QUIZ EXPERIENCE',
+  theme: 'indigo',
+  roomCode: makeCode(),
+  points: 10,
+  wrongPenalty: 0,
+  rewardEmoji: '🍫',
+  rewardName: 'Chocolate',
+  grandPrize: 'Grand Prize 🎁',
+  questions: IS_LIVE_FIREBASE ? [] : SAMPLE_QUESTIONS.map(q => ({ ...q }))
+};
+
+// Active Room Data (Mirrors Firebase RTDB structure cleanly)
+let roomData = {
+  meta: {
+    eventTitle: 'Strategy Socials',
+    tagline: 'THE LIVE QUIZ EXPERIENCE',
+    theme: 'indigo',
+    points: 10,
+    wrongPenalty: 0,
+    rewardEmoji: '🍫',
+    rewardName: 'Chocolate',
+    grandPrize: 'Grand Prize 🎁'
+  },
+  state: {
+    phase: 'lobby',
+    questionIndex: 0,
+    total: 0,
+    answer: '',
+    awardedTo: '',
+    awardedAvatar: '',
+    wasCorrect: false,
+    lastWrong: '',
+    returnPhase: 'question'
+  },
+  questions: [],
+  players: {},
+  buzz: {}
+};
+
+function makeCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function toast(msg) {
+  const el = $('#toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('on'), 2600);
+}
+
+/* ============================================================================
+   RICH WEB AUDIO SOUND ENGINE (Team-Event Game Show SFX)
+   ============================================================================ */
+function playTone(freq, dur, type = 'sine', gain = 0.16, delay = 0, slideTo = null) {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime + delay;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g);
+    g.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.03);
+  } catch (e) {}
+}
+
+function playSound(kind) {
+  if (!soundOn) return;
+  if (kind === 'join') {
+    playTone(520, 0.11, 'sine', 0.14, 0, 660);
+    playTone(784, 0.14, 'triangle', 0.14, 0.09, 880);
+  } else if (kind === 'start') {
+    [440, 554, 659, 880].forEach((f, i) => playTone(f, 0.22, 'triangle', 0.16, i * 0.08));
+  } else if (kind === 'buzz') {
+    playTone(920, 0.18, 'square', 0.14, 0, 860);
+    playTone(690, 0.28, 'sawtooth', 0.12, 0.1, 640);
+    playTone(180, 0.22, 'triangle', 0.18, 0, 120);
+  } else if (kind === 'correct') {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playTone(f, 0.32, 'triangle', 0.18, i * 0.085));
+    playTone(1318.5, 0.4, 'sine', 0.12, 0.34);
+  } else if (kind === 'wrong') {
+    playTone(250, 0.24, 'sawtooth', 0.14, 0, 210);
+    playTone(185, 0.38, 'sawtooth', 0.15, 0.18, 130);
+  } else if (kind === 'reveal') {
+    playTone(392, 0.2, 'triangle', 0.14, 0);
+    playTone(587.3, 0.3, 'triangle', 0.15, 0.12);
+  } else if (kind === 'leaderboard') {
+    [392, 493.88, 587.33, 783.99].forEach((f, i) => playTone(f, 0.26, 'sine', 0.14, i * 0.07));
+  } else if (kind === 'finale') {
+    [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5].forEach((f, i) =>
+      playTone(f, i === 5 ? 0.55 : 0.2, 'triangle', 0.18, i * 0.11)
+    );
+  }
+}
+
+function launchConfetti(power = 1) {
+  if (typeof window.confetti === 'function') {
+    try {
+      window.confetti({ particleCount: Math.round(70 * power), spread: 75, origin: { y: 0.62 } });
+      if (power > 1.2) {
+        setTimeout(() => window.confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0 } }), 250);
+        setTimeout(() => window.confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1 } }), 450);
+      }
+      return;
+    } catch (e) {}
+  }
+  const n = Math.round(60 * power);
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('i');
+    d.className = 'confetti-piece';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.background = `hsl(${Math.random() * 360},90%,62%)`;
+    d.style.animationDelay = Math.random() * 0.6 + 's';
+    d.style.animationDuration = 2.2 + Math.random() * 1.8 + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 4800);
+  }
+}
+
+/* ============================================================================
+   FIREBASE INITIALIZATION & TWO-LINK ROUTING
+   ============================================================================ */
+function initFirebase() {
+  if (!IS_LIVE_FIREBASE) return false;
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+  return true;
+}
+
+function isHostUrl() {
+  const params = new URLSearchParams(location.search);
+  return params.get('host') === '1' || params.get('host') === 'true' || location.hash === '#host';
+}
+
+function getPlayerJoinUrl(code) {
+  const base = (location.origin && location.origin !== 'null' ? location.origin : 'https://your-username.github.io') +
+    location.pathname.replace(/host\.html$/i, 'index.html');
+  return code ? `${base}?room=${encodeURIComponent(code)}` : base;
+}
+
+function getHostUrl() {
+  const base = (location.origin && location.origin !== 'null' ? location.origin : 'https://your-username.github.io') +
+    location.pathname;
+  return `${base}?host=1`;
+}
+
+function copyText(text, label = 'Copied!') {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast(label)).catch(() => fallbackCopy(text, label));
+  } else {
+    fallbackCopy(text, label);
+  }
+}
+function fallbackCopy(text, label) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast(label); } catch (e) { toast('Copy failed — select manually'); }
+  ta.remove();
+}
+
+/* ============================================================================
+   DATA HELPERS & BUZZER QUEUE LOGIC
+   ============================================================================ */
+function getSortedPlayers() {
+  return Object.entries(roomData.players || {})
+    .filter(([, p]) => p && p.name)
+    .sort((a, b) => (b[1].score || 0) - (a[1].score || 0) || (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
+}
+
+function getBuzzQueue() {
+  return Object.entries(roomData.buzz || {})
+    .filter(([, b]) => b && b.name)
+    .sort((a, b) => (a[1].t || 0) - (b[1].t || 0));
+}
+
+function getActiveBuzzer() {
+  return getBuzzQueue().find(([, b]) => !b.out) || null;
+}
+
+function applyTheme(theme) {
+  document.body.setAttribute('data-theme', theme || 'indigo');
+}
+
+/* ============================================================================
+   UI HEADER & DEMO RIBBON
+   ============================================================================ */
+function renderDemoBar() {
+  if (IS_LIVE_FIREBASE) { demoBarEl.innerHTML = ''; return; }
+  demoBarEl.innerHTML = `
+    <div class="demo-bar">
+      <div class="demo-badge"><i></i><span>Interactive Preview Mode · Paste Firebase keys in index.html to go live</span></div>
+      <div class="demo-tabs">
+        <button class="demo-tab ${demoView === 'setup' ? 'active' : ''}" onclick="switchDemoView('setup')">⚙️ Host Form</button>
+        <button class="demo-tab ${demoView === 'host' ? 'active' : ''}" onclick="switchDemoView('host')">📽️ Host Projector</button>
+        <button class="demo-tab ${demoView === 'player' ? 'active' : ''}" onclick="switchDemoView('player')">📱 Phone Buzzer</button>
+        <button class="demo-tab" onclick="openSetupGuide()">📖 Firebase & GitHub Guide</button>
+      </div>
+    </div>`;
+}
+
+function switchDemoView(view) {
+  demoView = view;
+  lastScreenKey = '';
+  renderedLobbyPlayers.clear();
+  lbRowNodes = {};
+  if (view === 'setup') {
+    role = 'host';
+    renderHostSetup();
+  } else if (view === 'host') {
+    role = 'host';
+    if (!roomId) initDemoRoom();
+    renderRoom();
+  } else if (view === 'player') {
+    role = 'player';
+    if (!roomId) initDemoRoom();
+    if (!playerId) {
+      playerId = 'demo_me';
+      if (!roomData.players[playerId]) {
+        roomData.players[playerId] = { name: 'You (Phone)', avatar: '🔥', score: 0, wins: 0, online: true, joinedAt: Date.now() };
+      }
+    }
+    renderRoom();
+  }
+  renderDemoBar();
+}
+
+function initDemoRoom() {
+  roomId = setupState.roomCode || 'LIVE5';
+  roomData.meta = {
+    eventTitle: setupState.eventTitle || 'Strategy Socials',
+    tagline: setupState.tagline || 'THE LIVE QUIZ EXPERIENCE',
+    theme: setupState.theme || 'indigo',
+    points: Number(setupState.points) || 10,
+    wrongPenalty: Number(setupState.wrongPenalty) || 0,
+    rewardEmoji: setupState.rewardEmoji,
+    rewardName: setupState.rewardName,
+    grandPrize: setupState.grandPrize || 'Grand Prize 🎁'
+  };
+  roomData.questions = setupState.questions.length ? setupState.questions.map((q, i) => ({ ...q, number: i + 1 })) : SAMPLE_QUESTIONS;
+  roomData.state = {
+    phase: 'lobby',
+    questionIndex: 0,
+    total: roomData.questions.length,
+    answer: '',
+    awardedTo: '',
+    awardedAvatar: '',
+    wasCorrect: false,
+    lastWrong: '',
+    returnPhase: 'question'
+  };
+  roomData.buzz = {};
+  if (!Object.keys(roomData.players || {}).length) {
+    const now = Date.now();
+    roomData.players = {
+      p_aarav: { name: 'Aarav', avatar: '🚀', score: 20, wins: 2, online: true, joinedAt: now - 3000 },
+      p_priya: { name: 'Priya', avatar: '⚡', score: 10, wins: 1, online: true, joinedAt: now - 2000 },
+      p_rohan: { name: 'Rohan', avatar: '🦁', score: 10, wins: 1, online: true, joinedAt: now - 1000 }
+    };
+  }
+  applyTheme(roomData.meta.theme);
+}
+
+function headerHTML(extra = '') {
+  const m = roomData.meta || setupState;
+  return `
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">✦</div>
+        <div>
+          <div class="brand-title">${esc(m.eventTitle || 'Strategy Socials')}</div>
+          <div class="brand-sub">${esc(m.tagline || 'THE LIVE QUIZ EXPERIENCE')}</div>
+        </div>
+      </div>
+      <div class="top-controls">
+        <button class="pill-btn" onclick="toggleSound()">🔊 Sound: <span id="soundLabel">${soundOn ? 'ON' : 'OFF'}</span></button>
+        ${role === 'host' ? `<button class="pill-btn" onclick="toggleProjector()">⛶ Projector</button>` : ''}
+        ${extra}
+        <span class="live-pill"><i></i>LIVE</span>
+      </div>
+    </header>`;
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  const el = $('#soundLabel');
+  if (el) el.textContent = soundOn ? 'ON' : 'OFF';
+  if (soundOn) playSound('join');
+}
+
+function toggleProjector() {
+  document.documentElement.classList.toggle('projector');
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+/* ============================================================================
+   SCREEN 1: PLAYER JOIN ONLY (Public Link — ZERO Create Room Button!)
+   ============================================================================ */
+function renderPlayerJoin() {
+  role = 'player';
+  screen = 'join';
+  lastScreenKey = 'join';
+  const urlRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase().slice(0, 8);
+  const savedName = safeGet('quiz_player_name', '');
+
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML()}
+      <div class="join-wrap">
+        <div class="eyebrow">READY TO PLAY?</div>
+        <h1 class="h1-hero" style="font-size:clamp(34px,7vw,54px)">JOIN THE <span class="grad-text">QUIZ.</span></h1>
+        <p class="muted" style="margin-bottom:22px">Enter the room code shown on the big screen and get your buzzer ready.</p>
+        <div class="panel" style="text-align:left">
+          <label class="field-label" for="joinCode">Room Code</label>
+          <input id="joinCode" class="field code-input" placeholder="ABCDE" maxlength="8" value="${esc(urlRoom)}">
+
+          <label class="field-label" for="joinName">Your Name</label>
+          <input id="joinName" class="field" placeholder="Enter your name" maxlength="20" value="${esc(savedName)}">
+
+          <label class="field-label">Pick Your Avatar</label>
+          <div class="avatar-picker" id="avatarPicker">
+            ${AVATARS.map(a => `<button type="button" class="avatar-opt ${a === selectedAvatar ? 'selected' : ''}" onclick="pickAvatar('${a}')">${a}</button>`).join('')}
+          </div>
+
+          <button class="btn full" style="margin-top:18px;font-size:17px;padding:15px" onclick="handleJoinRoom()">Join Game →</button>
+        </div>
+        <p class="tiny" style="margin-top:16px">Fastest finger buzzes first · Sound ON recommended</p>
+      </div>
+    </div>`;
+}
+
+function pickAvatar(av) {
+  selectedAvatar = av;
+  document.querySelectorAll('.avatar-opt').forEach(btn => {
+    btn.classList.toggle('selected', btn.textContent === av);
+  });
+  playSound('join');
+}
+
+async function handleJoinRoom() {
+  const code = ($('#joinCode')?.value || '').trim().toUpperCase();
+  const name = ($('#joinName')?.value || '').trim();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) return toast('Enter a valid 4–8 character room code.');
+  if (!name) return toast('Please enter your name.');
+  safeSet('quiz_player_name', name);
+
+  if (!IS_LIVE_FIREBASE) {
+    initDemoRoom();
+    roomId = code;
+    playerId = 'demo_me';
+    roomData.players[playerId] = { name, avatar: selectedAvatar, score: 0, wins: 0, online: true, joinedAt: Date.now() };
+    demoView = 'player';
+    playSound('join');
+    renderDemoBar();
+    renderRoom();
+    return;
+  }
+
+  try {
+    initFirebase();
+    const ref = db.ref('rooms/' + code);
+    const snap = await ref.once('value');
+    if (!snap.exists()) return toast('Room not found. Double-check the code on screen.');
+    const data = snap.val();
+    roomId = code;
+    role = 'player';
+    playerId = safeGet('quiz_pid_' + code) || ('p_' + Math.random().toString(36).slice(2, 10));
+    safeSet('quiz_pid_' + code, playerId);
+    const pRef = ref.child('players/' + playerId);
+    const existing = (await pRef.once('value')).val();
+    if (existing) {
+      await pRef.update({ name, avatar: selectedAvatar, online: true });
+    } else {
+      await pRef.set({ name, avatar: selectedAvatar, score: 0, wins: 0, online: true, joinedAt: firebase.database.ServerValue.TIMESTAMP });
+    }
+    pRef.onDisconnect().update({ online: false });
+    playSound('join');
+    listenFirebaseRoom();
+  } catch (e) {
+    toast('Could not join: ' + e.message);
+  }
+}
+
+/* ============================================================================
+   SCREEN 2: OWNER HOST SETUP FORM (Private Link Only: ?host=1 or host.html)
+   ============================================================================ */
+function renderHostPinGate() {
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML()}
+      <div class="join-wrap">
+        <div class="eyebrow">OWNER ACCESS ONLY</div>
+        <h1 class="h1-hero" style="font-size:clamp(32px,6vw,48px)">Host <span class="grad-text">Control Room</span></h1>
+        <div class="panel" style="margin-top:20px;text-align:left">
+          <label class="field-label" for="pinInput">Owner Passcode</label>
+          <input id="pinInput" type="password" class="field code-input" placeholder="••••" maxlength="12">
+          <button class="btn full" style="margin-top:16px" onclick="verifyHostPin()">Unlock Host Studio →</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function verifyHostPin() {
+  const val = ($('#pinInput')?.value || '').trim();
+  if (val === OWNER_HOST_PIN) {
+    hostUnlocked = true;
+    playSound('start');
+    renderHostSetup();
+  } else {
+    toast('Incorrect passcode.');
+    playSound('wrong');
+  }
+}
+
+function renderHostSetup() {
+  if (OWNER_HOST_PIN && !hostUnlocked) return renderHostPinGate();
+  role = 'host';
+  screen = 'setup';
+  lastScreenKey = 'setup';
+  applyTheme(setupState.theme);
+  const lastRoom = IS_LIVE_FIREBASE ? safeGet('quiz_last_host_room', '') : '';
+
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML(`<button class="pill-btn" onclick="openSetupGuide()">📖 Setup Guide</button>`)}
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:20px">
+        <div>
+          <div class="eyebrow">OWNER STUDIO · FAST FORM SETUP</div>
+          <h1 class="h1-hero" style="font-size:clamp(30px,4.5vw,48px);margin:6px 0 4px">Build Your <span class="grad-text">Live Quiz.</span></h1>
+          <p class="muted">Configure your event in seconds, upload pictures, and launch on the big screen.</p>
+        </div>
+        ${lastRoom ? `<button class="btn secondary sm" onclick="resumeHostRoom('${esc(lastRoom)}')">↩ Resume Room ${esc(lastRoom)}</button>` : ''}
+      </div>
+
+      <div class="setup-grid">
+        <!-- LEFT: Question Builder -->
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <div class="eyebrow">STEP 1</div>
+              <h2 class="h2-title">Picture Questions</h2>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="pill-btn" onclick="exportQuizPack()">⬇ Save Pack</button>
+              <label class="pill-btn" style="cursor:pointer">⬆ Load Pack<input type="file" accept=".json" hidden onchange="importQuizPack(this.files[0])"></label>
+            </div>
+          </div>
+
+          <label class="dropzone" id="dropzone">
+            <div style="font-size:28px;margin-bottom:6px">🖼️</div>
+            <div style="font-weight:800">Click or drag & drop picture questions</div>
+            <div class="tiny" style="margin-top:4px">Upload multiple JPG / PNG / WebP images at once · Auto-optimized for fast loading</div>
+            <input type="file" accept="image/*" multiple hidden onchange="addQuestionFiles(this.files)">
+          </label>
+
+          <div id="qList" class="q-list"></div>
+          <div id="qSummary" class="tiny" style="margin-top:10px"></div>
+        </div>
+
+        <!-- RIGHT: Event Settings Form -->
+        <div class="panel">
+          <div class="eyebrow">STEP 2</div>
+          <h2 class="h2-title" style="margin-bottom:6px">Event & Scoring Settings</h2>
+
+          <label class="field-label" for="setTitle">Event Title</label>
+          <input id="setTitle" class="field" value="${esc(setupState.eventTitle)}" oninput="setupState.eventTitle=this.value">
+
+          <label class="field-label" for="setTagline">Subtitle / Tagline</label>
+          <input id="setTagline" class="field" value="${esc(setupState.tagline)}" oninput="setupState.tagline=this.value">
+
+          <div class="form-2col">
+            <div>
+              <label class="field-label" for="setPoints">Points per Correct</label>
+              <input id="setPoints" type="number" min="1" max="1000" class="field" value="${setupState.points}" oninput="setupState.points=Number(this.value)||10">
+            </div>
+            <div>
+              <label class="field-label" for="setPenalty">Wrong Answer Penalty</label>
+              <input id="setPenalty" type="number" min="0" max="100" class="field" value="${setupState.wrongPenalty}" oninput="setupState.wrongPenalty=Math.max(0,Number(this.value)||0)">
+            </div>
+          </div>
+
+          <div class="form-2col">
+            <div>
+              <label class="field-label" for="setReward">Round Reward Badge</label>
+              <select id="setReward" class="field" onchange="updateReward(this.value)">
+                <option value="🍫|Chocolate" ${setupState.rewardEmoji==='🍫'?'selected':''}>🍫 Chocolate</option>
+                <option value="⭐|Star" ${setupState.rewardEmoji==='⭐'?'selected':''}>⭐ Star</option>
+                <option value="🔥|Streak" ${setupState.rewardEmoji==='🔥'?'selected':''}>🔥 Streak</option>
+                <option value="|" ${!setupState.rewardEmoji?'selected':''}>None</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="setGrand">Grand Prize Label</label>
+              <input id="setGrand" class="field" value="${esc(setupState.grandPrize)}" oninput="setupState.grandPrize=this.value">
+            </div>
+          </div>
+
+          <label class="field-label">Stage Theme</label>
+          <div class="theme-dots">
+            <button type="button" class="theme-dot ${setupState.theme==='indigo'?'active':''}" style="background:linear-gradient(135deg,#6366f1,#ec4899)" title="Midnight Indigo" onclick="pickTheme('indigo')"></button>
+            <button type="button" class="theme-dot ${setupState.theme==='corporate'?'active':''}" style="background:linear-gradient(135deg,#0091da,#7213ea)" title="Royal Corporate" onclick="pickTheme('corporate')"></button>
+            <button type="button" class="theme-dot ${setupState.theme==='sunset'?'active':''}" style="background:linear-gradient(135deg,#f97316,#ec4899)" title="Vibrant Sunset" onclick="pickTheme('sunset')"></button>
+            <button type="button" class="theme-dot ${setupState.theme==='emerald'?'active':''}" style="background:linear-gradient(135deg,#10b981,#06b6d4)" title="Emerald Gala" onclick="pickTheme('emerald')"></button>
+          </div>
+
+          <label class="field-label" for="setCode">Room Code</label>
+          <div style="display:flex;gap:8px">
+            <input id="setCode" class="field code-input" maxlength="8" value="${esc(setupState.roomCode)}" oninput="setupState.roomCode=this.value.toUpperCase();updateLinkPreview()">
+            <button type="button" class="btn secondary" onclick="regenCode()" title="Generate new code">🎲</button>
+          </div>
+
+          <div class="link-box">
+            <div style="min-width:0">
+              <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase">Player Join Link (No Create Button)</div>
+              <div id="playerLinkPreview" class="link-url">${esc(getPlayerJoinUrl(setupState.roomCode))}</div>
+            </div>
+            <button type="button" class="btn secondary sm" onclick="copyText(getPlayerJoinUrl(setupState.roomCode),'Player link copied!')">Copy</button>
+          </div>
+
+          <button class="btn full" style="margin-top:18px;padding:16px;font-size:16px" onclick="handleCreateRoom()">🚀 Launch Live Room →</button>
+        </div>
+      </div>
+    </div>`;
+
+  renderQuestionList();
+  wireDropzone();
+}
+
+function wireDropzone() {
+  const dz = $('#dropzone');
+  if (!dz) return;
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e => { if (e.dataTransfer?.files?.length) addQuestionFiles(e.dataTransfer.files); });
+}
+
+function updateReward(val) {
+  const [emoji, name] = val.split('|');
+  setupState.rewardEmoji = emoji || '';
+  setupState.rewardName = name || '';
+}
+
+function pickTheme(t) {
+  setupState.theme = t;
+  applyTheme(t);
+  document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active'));
+  renderHostSetup();
+}
+
+function regenCode() {
+  setupState.roomCode = makeCode();
+  const el = $('#setCode');
+  if (el) el.value = setupState.roomCode;
+  updateLinkPreview();
+}
+
+function updateLinkPreview() {
+  const el = $('#playerLinkPreview');
+  if (el) el.textContent = getPlayerJoinUrl(setupState.roomCode);
+}
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1080 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = err => { URL.revokeObjectURL(url); reject(err); };
+    img.src = url;
+  });
+}
+
+async function addQuestionFiles(files) {
+  for (const f of Array.from(files)) {
+    try {
+      const dataUrl = await compressImage(f);
+      setupState.questions.push({
+        image: dataUrl,
+        prompt: 'Who knows this one?',
+        answer: ''
+      });
+    } catch (e) {
+      toast('Could not read ' + f.name);
+    }
+  }
+  renderQuestionList();
+  playSound('join');
+}
+
+function renderQuestionList() {
+  const listEl = $('#qList');
+  const sumEl = $('#qSummary');
+  if (!listEl) return;
+  if (!setupState.questions.length) {
+    listEl.innerHTML = `<div class="tiny" style="text-align:center;padding:18px;background:rgba(255,255,255,.03);border-radius:14px">No pictures added yet. Upload images above to build your rounds.</div>`;
+    if (sumEl) sumEl.textContent = '0 questions ready';
+    return;
+  }
+  listEl.innerHTML = setupState.questions.map((q, i) => `
+    <div class="q-item">
+      <img class="q-thumb" src="${q.image}" alt="Q${i + 1}">
+      <div>
+        <div style="font-size:12px;font-weight:800;color:var(--cyan);margin-bottom:4px">ROUND ${i + 1}</div>
+        <input class="field" style="padding:9px 12px;font-size:14px;margin-bottom:6px" placeholder="Correct Answer (required)" value="${esc(q.answer)}" oninput="setupState.questions[${i}].answer=this.value">
+        <input class="field" style="padding:8px 12px;font-size:13px;opacity:.88" placeholder="Optional prompt shown above image" value="${esc(q.prompt || '')}" oninput="setupState.questions[${i}].prompt=this.value">
+      </div>
+      <div class="q-tools">
+        <button type="button" class="icon-btn" onclick="moveQ(${i},-1)" title="Move up">↑</button>
+        <button type="button" class="icon-btn" onclick="moveQ(${i},1)" title="Move down">↓</button>
+        <button type="button" class="icon-btn del" onclick="delQ(${i})" title="Remove">✕</button>
+      </div>
+    </div>`).join('');
+  if (sumEl) sumEl.textContent = `${setupState.questions.length} question${setupState.questions.length === 1 ? '' : 's'} ready`;
+}
+
+function moveQ(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= setupState.questions.length) return;
+  [setupState.questions[i], setupState.questions[j]] = [setupState.questions[j], setupState.questions[i]];
+  renderQuestionList();
+}
+
+function delQ(i) {
+  setupState.questions.splice(i, 1);
+  renderQuestionList();
+}
+
+function exportQuizPack() {
+  if (!setupState.questions.length) return toast('Add at least one question before saving.');
+  const blob = new Blob([JSON.stringify(setupState, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `quiz-pack-${(setupState.roomCode || 'event').toLowerCase()}.json`;
+  a.click();
+  toast('Quiz pack saved!');
+}
+
+function importQuizPack(file) {
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      if (!Array.isArray(parsed.questions)) throw Error('Invalid pack');
+      setupState = { ...setupState, ...parsed, roomCode: makeCode() };
+      renderHostSetup();
+      toast(`Loaded ${setupState.questions.length} questions!`);
+    } catch (e) {
+      toast('Invalid quiz pack JSON file.');
+    }
+  };
+  r.readAsText(file);
+}
+
+async function handleCreateRoom() {
+  const code = (setupState.roomCode || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) return toast('Room code must be 4–8 letters or numbers.');
+  if (!setupState.questions.length) return toast('Add at least one picture question.');
+  if (setupState.questions.some(q => !q.answer.trim())) return toast('Please fill in the answer for every picture.');
+
+  const payload = {
+    meta: {
+      createdAt: IS_LIVE_FIREBASE ? firebase.database.ServerValue.TIMESTAMP : Date.now(),
+      eventTitle: setupState.eventTitle.trim() || 'Strategy Socials',
+      tagline: setupState.tagline.trim() || 'THE LIVE QUIZ EXPERIENCE',
+      theme: setupState.theme || 'indigo',
+      points: Math.max(1, Number(setupState.points) || 10),
+      wrongPenalty: Math.max(0, Number(setupState.wrongPenalty) || 0),
+      rewardEmoji: setupState.rewardEmoji,
+      rewardName: setupState.rewardName,
+      grandPrize: setupState.grandPrize.trim() || 'Grand Prize 🎁'
+    },
+    state: {
+      phase: 'lobby',
+      questionIndex: 0,
+      total: setupState.questions.length,
+      answer: '',
+      awardedTo: '',
+      awardedAvatar: '',
+      wasCorrect: false,
+      lastWrong: '',
+      returnPhase: 'question'
+    },
+    questions: setupState.questions.map((q, i) => ({
+      image: q.image,
+      prompt: (q.prompt || '').trim(),
+      answer: q.answer.trim(),
+      number: i + 1
+    })),
+    players: {},
+    buzz: {}
+  };
+
+  if (!IS_LIVE_FIREBASE) {
+    roomId = code;
+    roomData = payload;
+    const now = Date.now();
+    roomData.players = {
+      p_aarav: { name: 'Aarav', avatar: '🚀', score: 0, wins: 0, online: true, joinedAt: now - 3000 },
+      p_priya: { name: 'Priya', avatar: '⚡', score: 0, wins: 0, online: true, joinedAt: now - 2000 }
+    };
+    demoView = 'host';
+    role = 'host';
+    renderedLobbyPlayers.clear();
+    lastScreenKey = '';
+    playSound('start');
+    renderDemoBar();
+    renderRoom();
+    return;
+  }
+
+  try {
+    initFirebase();
+    const ref = db.ref('rooms/' + code);
+    await ref.set(payload);
+    roomId = code;
+    role = 'host';
+    safeSet('quiz_last_host_room', code);
+    playSound('start');
+    listenFirebaseRoom();
+  } catch (e) {
+    toast('Could not create room: ' + e.message);
+  }
+}
+
+async function resumeHostRoom(code) {
+  try {
+    initFirebase();
+    const snap = await db.ref('rooms/' + code).once('value');
+    if (!snap.exists()) return toast('Previous room no longer exists.');
+    roomId = code;
+    role = 'host';
+    listenFirebaseRoom();
+  } catch (e) {
+    toast('Could not resume: ' + e.message);
+  }
+}
+
+/* ============================================================================
+   FIREBASE REALTIME LISTENERS
+   ============================================================================ */
+function detachListeners() {
+  listeners.forEach(([ref, fn]) => ref.off('value', fn));
+  listeners = [];
+}
+
+function listenFirebaseRoom() {
+  detachListeners();
+  renderedLobbyPlayers.clear();
+  lbRowNodes = {};
+  lastScreenKey = '';
+  const base = db.ref('rooms/' + roomId);
+  ['meta', 'state', 'questions', 'players', 'buzz'].forEach(key => {
+    const r = base.child(key);
+    const fn = snap => {
+      roomData[key] = snap.val() || (key === 'questions' ? [] : {});
+      if (key === 'meta') applyTheme(roomData.meta.theme);
+      handleReactiveAudio();
+      renderRoom();
+    };
+    r.on('value', fn);
+    listeners.push([r, fn]);
+  });
+}
+
+function handleReactiveAudio() {
+  const s = roomData.state || {};
+  const active = getActiveBuzzer();
+  const activeId = active ? active[0] : '';
+  const outCount = getBuzzQueue().filter(([, b]) => b.out).length;
+  const pCount = Object.keys(roomData.players || {}).length;
+
+  if (s.phase === 'lobby' && pCount > seenState.playerCount && seenState.playerCount > 0) {
+    playSound('join');
+  }
+  if (s.phase === 'question' && (seenState.phase !== 'question' || seenState.questionIndex !== s.questionIndex)) {
+    playSound('start');
+  }
+  if (s.phase === 'question' && activeId && activeId !== seenState.activeBuzzId) {
+    playSound('buzz');
+    if (role === 'host') toast(`${active[1].name} buzzed in!`);
+  }
+  if (s.phase === 'question' && outCount > seenState.outCount) {
+    playSound('wrong');
+  }
+  if (s.phase === 'reveal' && seenState.phase !== 'reveal') {
+    if (s.wasCorrect) { playSound('correct'); launchConfetti(1); }
+    else playSound('reveal');
+  }
+  if (s.phase === 'leaderboard' && seenState.phase !== 'leaderboard') {
+    playSound('leaderboard');
+  }
+  if (s.phase === 'end' && seenState.phase !== 'end') {
+    playSound('finale');
+    launchConfetti(1.8);
+  }
+
+  seenState = {
+    phase: s.phase || '',
+    activeBuzzId: activeId,
+    outCount,
+    playerCount: pCount,
+    questionIndex: s.questionIndex ?? -1
+  };
+}
+
+/* ============================================================================
+   ROOM STATE MUTATIONS (Firebase or Local Demo seamlessly)
+   ============================================================================ */
+async function updateState(patch) {
+  if (IS_LIVE_FIREBASE) {
+    await db.ref(`rooms/${roomId}/state`).update(patch);
+  } else {
+    Object.assign(roomData.state, patch);
+    handleReactiveAudio();
+    renderRoom();
+  }
+}
+
+async function startGame() {
+  const list = getSortedPlayers();
+  if (!list.length) return toast('Wait for at least 1 player to join.');
+  prevRankMap = {};
+  list.forEach(([id], idx) => { prevRankMap[id] = idx; });
+  if (IS_LIVE_FIREBASE) {
+    await db.ref(`rooms/${roomId}`).update({
+      buzz: null,
+      'state/phase': 'question',
+      'state/questionIndex': 0,
+      'state/answer': '',
+      'state/awardedTo': '',
+      'state/awardedAvatar': '',
+      'state/wasCorrect': false,
+      'state/lastWrong': ''
+    });
+  } else {
+    roomData.buzz = {};
+    Object.assign(roomData.state, {
+      phase: 'question', questionIndex: 0, answer: '', awardedTo: '', awardedAvatar: '', wasCorrect: false, lastWrong: ''
+    });
+    handleReactiveAudio();
+    renderRoom();
+  }
+}
+
+async function playerBuzz() {
+  const s = roomData.state || {};
+  if (s.phase !== 'question') return;
+  if ((roomData.buzz || {})[playerId]) return;
+  const me = (roomData.players || {})[playerId];
+  if (!me) return;
+  try { navigator.vibrate?.(45); } catch (e) {}
+
+  if (IS_LIVE_FIREBASE) {
+    await db.ref(`rooms/${roomId}/buzz/${playerId}`).set({
+      name: me.name,
+      avatar: me.avatar || '⚡',
+      t: firebase.database.ServerValue.TIMESTAMP,
+      out: false
+    });
+  } else {
+    roomData.buzz[playerId] = { name: me.name, avatar: me.avatar || '⚡', t: Date.now(), out: false };
+    handleReactiveAudio();
+    renderRoom();
+  }
+}
+
+let judgeLock = false;
+async function judgeActive(isCorrect) {
+  if (judgeLock) return;
+  const active = getActiveBuzzer();
+  if (!active) return;
+  judgeLock = true;
+  const [pid, b] = active;
+  const s = roomData.state;
+  const q = (roomData.questions || [])[s.questionIndex] || {};
+  const pts = Number(roomData.meta.points) || 10;
+  const pen = Number(roomData.meta.wrongPenalty) || 0;
+
+  try {
+    if (isCorrect) {
+      if (IS_LIVE_FIREBASE) {
+        await db.ref(`rooms/${roomId}/players/${pid}/score`).transaction(cur => (cur || 0) + pts);
+        await db.ref(`rooms/${roomId}/players/${pid}/wins`).transaction(cur => (cur || 0) + 1);
+        await db.ref(`rooms/${roomId}/state`).update({
+          phase: 'reveal',
+          answer: q.answer || '',
+          awardedTo: b.name,
+          awardedAvatar: b.avatar || '🏆',
+          wasCorrect: true,
+          lastWrong: ''
+        });
+      } else {
+        const p = roomData.players[pid];
+        if (p) { p.score = (p.score || 0) + pts; p.wins = (p.wins || 0) + 1; }
+        Object.assign(roomData.state, {
+          phase: 'reveal', answer: q.answer || '', awardedTo: b.name, awardedAvatar: b.avatar || '🏆', wasCorrect: true, lastWrong: ''
+        });
+        handleReactiveAudio();
+        renderRoom();
+      }
+    } else {
+      if (IS_LIVE_FIREBASE) {
+        if (pen > 0) {
+          await db.ref(`rooms/${roomId}/players/${pid}/score`).transaction(cur => Math.max(0, (cur || 0) - pen));
+        }
+        await db.ref(`rooms/${roomId}/buzz/${pid}/out`).set(true);
+        await db.ref(`rooms/${roomId}/state/lastWrong`).set(b.name);
+      } else {
+        if (pen > 0 && roomData.players[pid]) {
+          roomData.players[pid].score = Math.max(0, (roomData.players[pid].score || 0) - pen);
+        }
+        roomData.buzz[pid].out = true;
+        roomData.state.lastWrong = b.name;
+        handleReactiveAudio();
+        renderRoom();
+      }
+    }
+  } finally {
+    judgeLock = false;
+  }
+}
+
+async function revealAnswerOnly() {
+  const q = (roomData.questions || [])[roomData.state.questionIndex] || {};
+  await updateState({
+    phase: 'reveal',
+    answer: q.answer || '',
+    awardedTo: '',
+    awardedAvatar: '',
+    wasCorrect: false
+  });
+}
+
+async function openLeaderboard() {
+  const curPhase = roomData.state.phase;
+  await updateState({ phase: 'leaderboard', returnPhase: curPhase });
+}
+
+async function nextQuestion() {
+  const s = roomData.state;
+  const list = getSortedPlayers();
+  list.forEach(([id], idx) => { prevRankMap[id] = idx; });
+
+  if (s.questionIndex + 1 >= s.total) {
+    await updateState({ phase: 'end' });
+    return;
+  }
+  if (IS_LIVE_FIREBASE) {
+    await db.ref(`rooms/${roomId}`).update({
+      buzz: null,
+      'state/phase': 'question',
+      'state/questionIndex': s.questionIndex + 1,
+      'state/answer': '',
+      'state/awardedTo': '',
+      'state/awardedAvatar': '',
+      'state/wasCorrect': false,
+      'state/lastWrong': ''
+    });
+  } else {
+    roomData.buzz = {};
+    Object.assign(roomData.state, {
+      phase: 'question', questionIndex: s.questionIndex + 1, answer: '', awardedTo: '', awardedAvatar: '', wasCorrect: false, lastWrong: ''
+    });
+    handleReactiveAudio();
+    renderRoom();
+  }
+}
+
+async function continueFromLeaderboard() {
+  const s = roomData.state;
+  if (s.returnPhase === 'reveal') {
+    await nextQuestion();
+  } else {
+    await updateState({ phase: s.returnPhase || 'question' });
+  }
+}
+
+/* Demo Simulation Helpers */
+function demoAddPlayer() {
+  const existing = Object.values(roomData.players || {}).map(p => p.name);
+  const next = DEMO_PLAYERS_POOL.find(p => !existing.includes(p.name)) || {
+    name: 'Player ' + (existing.length + 1),
+    avatar: AVATARS[existing.length % AVATARS.length]
+  };
+  const id = 'p_' + Math.random().toString(36).slice(2, 8);
+  roomData.players[id] = { name: next.name, avatar: next.avatar, score: 0, wins: 0, online: true, joinedAt: Date.now() };
+  handleReactiveAudio();
+  renderRoom();
+}
+
+function demoSimBuzz() {
+  if (roomData.state.phase !== 'question') return;
+  const candidates = Object.entries(roomData.players || {}).filter(([id]) => !(roomData.buzz || {})[id]);
+  if (!candidates.length) return toast('Everyone has already buzzed!');
+  const [id, p] = candidates[Math.floor(Math.random() * candidates.length)];
+  roomData.buzz[id] = { name: p.name, avatar: p.avatar || '⚡', t: Date.now(), out: false };
+  handleReactiveAudio();
+  renderRoom();
+}
+
+/* ============================================================================
+   RENDER DISPATCHER (Zero-Flicker Lobby & Smooth Animated Leaderboard)
+   ============================================================================ */
+function renderRoom() {
+  const s = roomData.state || {};
+  applyTheme(roomData.meta?.theme || 'indigo');
+  if (s.phase === 'lobby') return renderLobby();
+  if (s.phase === 'question') return renderQuestion();
+  if (s.phase === 'reveal') return renderReveal();
+  if (s.phase === 'leaderboard') return renderLeaderboard();
+  if (s.phase === 'end') return renderEnd();
+}
+
+function renderLobby() {
+  const isHost = role === 'host';
+  const list = getSortedPlayers();
+  const key = 'lobby_' + role + '_' + roomId;
+
+  if (lastScreenKey !== key) {
+    lastScreenKey = key;
+    renderedLobbyPlayers.clear();
+    const joinUrl = getPlayerJoinUrl(roomId);
+    const m = roomData.meta || {};
+    appEl.innerHTML = `
+      <div class="shell">
+        ${headerHTML()}
+        <div class="lobby-grid">
+          <div class="panel qr-card">
+            <div class="eyebrow">SCAN TO JOIN</div>
+            <div id="lobbyQr" class="qr-frame"></div>
+            <div class="tiny">OR ENTER ROOM CODE</div>
+            <div class="room-code-big">${esc(roomId)}</div>
+            <button class="btn secondary sm full" onclick="copyText('${esc(joinUrl)}','Player join link copied!')">🔗 Copy Player Join Link</button>
+            <div class="prize-banner" style="text-align:left">
+              <div style="font-size:28px">${m.rewardEmoji || '🏆'}</div>
+              <div>
+                <div style="font-weight:800;font-size:14px">+${m.points || 10} pts ${m.rewardEmoji ? '& ' + m.rewardEmoji + ' ' + (m.rewardName || '') : ''} per round</div>
+                <div class="tiny">Top scorer wins: ${esc(m.grandPrize || 'Grand Prize 🎁')}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+              <div>
+                <div class="eyebrow">LIVE LOBBY · PLAYERS POPPING IN</div>
+                <h2 class="h2-title" style="margin-top:4px"><span id="lobbyCount">${list.length}</span> Player<span id="lobbyPlural">${list.length === 1 ? '' : 's'}</span> Ready</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${!IS_LIVE_FIREBASE ? `<button class="btn secondary sm" onclick="demoAddPlayer()">＋ Simulate Join</button>` : ''}
+                ${isHost ? `<button class="btn" id="startBtn" onclick="startGame()" ${list.length ? '' : 'disabled'}>▶ Start Quiz (${roomData.state.total || 0} Rounds)</button>` : `<span class="pill-btn">🎮 You're in! Watch the big screen</span>`}
+              </div>
+            </div>
+            <div id="playerCloud" class="player-cloud"></div>
+          </div>
+        </div>
+      </div>`;
+
+    const qrBox = $('#lobbyQr');
+    if (qrBox && window.QRCode) {
+      qrBox.innerHTML = '';
+      new QRCode(qrBox, {
+        text: joinUrl,
+        width: 172,
+        height: 172,
+        colorDark: '#070a19',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }
+
+  // Incremental player pop-in (no QR flicker, only new players animate!)
+  const countEl = $('#lobbyCount');
+  const pluralEl = $('#lobbyPlural');
+  const startBtn = $('#startBtn');
+  const cloud = $('#playerCloud');
+  if (countEl) countEl.textContent = list.length;
+  if (pluralEl) pluralEl.textContent = list.length === 1 ? '' : 's';
+  if (startBtn) startBtn.disabled = list.length === 0;
+
+  if (cloud) {
+    if (!list.length) {
+      cloud.innerHTML = `<div id="lobbyEmpty" class="muted" style="padding:36px 0;width:100%;text-align:center">Waiting for players to scan the QR code or enter <b>${esc(roomId)}</b>…</div>`;
+    } else {
+      const emptyEl = $('#lobbyEmpty');
+      if (emptyEl) emptyEl.remove();
+      list.forEach(([id, p]) => {
+        let chip = document.getElementById('chip_' + id);
+        if (!chip) {
+          chip = document.createElement('div');
+          chip.id = 'chip_' + id;
+          chip.className = 'player-chip pop-in';
+          chip.innerHTML = `<div class="chip-avatar">${esc(p.avatar || '⚡')}</div><span class="chip-name">${esc(p.name)}</span><i class="chip-dot ${p.online === false ? 'off' : ''}"></i>`;
+          cloud.appendChild(chip);
+          renderedLobbyPlayers.add(id);
+        } else {
+          const dot = chip.querySelector('.chip-dot');
+          if (dot) dot.className = 'chip-dot ' + (p.online === false ? 'off' : '');
+        }
+      });
+    }
+  }
+}
+
+function renderQuestion() {
+  lastScreenKey = 'question';
+  const s = roomData.state || {};
+  const q = (roomData.questions || [])[s.questionIndex] || {};
+  const isHost = role === 'host';
+  const queue = getBuzzQueue();
+  const active = getActiveBuzzer();
+  const pct = s.total ? Math.round(((s.questionIndex + 1) / s.total) * 100) : 0;
+
+  if (!isHost) {
+    // PHONE PLAYER BUZZER VIEW
+    const me = (roomData.players || {})[playerId] || { name: 'Player', avatar: '⚡', score: 0 };
+    const myBuzz = (roomData.buzz || {})[playerId];
+    const activeQueue = queue.filter(([, b]) => !b.out);
+    const myPos = activeQueue.findIndex(([id]) => id === playerId) + 1;
+
+    let btnClass = 'big-buzzer';
+    let btnLabel = 'BUZZ!';
+    let subText = 'Tap as fast as you can when you know the answer!';
+    let disabled = false;
+
+    if (myBuzz) {
+      disabled = true;
+      if (myBuzz.out) {
+        btnClass += ' wrong-out';
+        btnLabel = 'OUT ❌';
+        subText = 'Wrong answer — wait for the next round!';
+      } else if (myPos === 1) {
+        btnClass += ' first-up';
+        btnLabel = 'YOU\'RE #1!';
+        subText = 'Say your answer out loud now!';
+      } else {
+        btnClass += ' queued';
+        btnLabel = `QUEUE #${myPos}`;
+        subText = 'You are locked in! If players ahead miss, you are up next.';
+      }
+    }
+
+    appEl.innerHTML = `
+      <div class="shell">
+        ${headerHTML()}
+        <div class="phone-stage">
+          <div class="player-mini-bar">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px">${esc(me.avatar || '⚡')}</span>
+              <b>${esc(me.name)}</b>
+            </div>
+            <div style="font-family:'Space Grotesk';font-weight:700;color:var(--gold)">${me.score || 0} pts</div>
+          </div>
+
+          <div class="eyebrow">ROUND ${s.questionIndex + 1} OF ${s.total}</div>
+          ${q.prompt ? `<div style="font-weight:700;font-size:18px;margin:6px 0 12px">${esc(q.prompt)}</div>` : ''}
+          ${q.image ? `<img class="q-image" style="max-height:26vh;border-radius:16px;margin:0 auto" src="${q.image}" alt="Quiz">` : ''}
+
+          <div class="buzz-btn-wrap">
+            <button class="${btnClass}" onclick="playerBuzz()" ${disabled ? 'disabled' : ''}>${btnLabel}</button>
+            <span class="buzz-ring"></span>
+          </div>
+
+          <p class="muted" style="font-weight:600">${subText}</p>
+          ${active && active[0] !== playerId ? `<div class="queue-pill" style="display:inline-block;margin-top:14px">🔔 Answering now: <b>${esc(active[1].name)}</b></div>` : ''}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // HOST / PROJECTOR STAGE VIEW
+  const waitingQueue = queue.filter(([id, b]) => !b.out && (!active || id !== active[0]));
+  const outPlayers = queue.filter(([, b]) => b.out);
+
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML()}
+      <div class="q-progress-wrap">
+        <span class="eyebrow">ROUND ${s.questionIndex + 1} / ${s.total}</span>
+        <div class="q-progress"><i style="width:${pct}%"></i></div>
+        <span class="tiny">${Object.keys(roomData.players || {}).length} players</span>
+      </div>
+
+      <div class="stage-card">
+        ${q.prompt ? `<div class="q-prompt-text">${esc(q.prompt)}</div>` : ''}
+        ${q.image ? `<div class="q-image-frame"><img class="q-image" src="${q.image}" alt="Question ${s.questionIndex + 1}"></div>` : ''}
+
+        ${active ? `
+          <div class="buzz-spotlight">
+            <div class="buzz-spotlight-avatar">${esc(active[1].avatar || '🔔')}</div>
+            <div style="text-align:left">
+              <div class="eyebrow" style="color:#fde68a">🔔 BUZZED IN FIRST!</div>
+              <div class="buzz-spotlight-name">${esc(active[1].name)}</div>
+            </div>
+          </div>` : `
+          <div style="margin-top:20px">
+            <div style="font-family:'Space Grotesk';font-weight:700;font-size:clamp(22px,3vw,34px)">Waiting for a buzzer…</div>
+            <div class="tiny" style="margin-top:4px">Everyone can press BUZZ on their phone — fastest finger gets the mic!</div>
+          </div>`}
+
+        ${s.lastWrong ? `<div class="wrong-banner">✕ ${esc(s.lastWrong)} missed — ${active ? `Next up: ${esc(active[1].name)}!` : 'Buzzer is open!'}</div>` : ''}
+
+        ${(waitingQueue.length || outPlayers.length) ? `
+          <div class="buzz-queue-strip">
+            ${waitingQueue.map(([, b], idx) => `<span class="queue-pill">Next #${idx + 2}: ${esc(b.avatar || '')} ${esc(b.name)}</span>`).join('')}
+            ${outPlayers.map(([, b]) => `<span class="queue-pill out">✕ ${esc(b.name)}</span>`).join('')}
+          </div>` : ''}
+
+        <div class="host-dock">
+          ${active ? `
+            <button class="btn green" onclick="judgeActive(true)">✓ Correct (+${roomData.meta.points || 10})</button>
+            <button class="btn red" onclick="judgeActive(false)">✕ Wrong · Next Buzzer</button>
+          ` : ''}
+          ${!IS_LIVE_FIREBASE ? `<button class="btn secondary sm" onclick="demoSimBuzz()">🔔 Simulate Buzz</button>` : ''}
+          <button class="btn secondary sm" onclick="revealAnswerOnly()">👁 Show Answer</button>
+          <button class="btn secondary sm" onclick="openLeaderboard()">📊 Leaderboard</button>
+          <button class="answer-peek" onclick="hideHostAnswer=!hideHostAnswer;renderQuestion()">
+            ${hideHostAnswer ? '🙈 Answer Hidden (Click to peek)' : `🔑 Answer: <b style="color:var(--gold)">${esc(q.answer)}</b>`}
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderReveal() {
+  lastScreenKey = 'reveal';
+  const s = roomData.state || {};
+  const m = roomData.meta || {};
+  const isHost = role === 'host';
+  const isLast = s.questionIndex + 1 >= s.total;
+
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML()}
+      <div class="stage-card">
+        <div class="reveal-card">
+          <div class="eyebrow">THE CORRECT ANSWER IS</div>
+          <div class="reveal-answer grad-text">${esc(s.answer || ((roomData.questions || [])[s.questionIndex]?.answer || ''))}</div>
+          ${s.wasCorrect ? `
+            <div class="reveal-winner">
+              <span>${esc(s.awardedAvatar || '🏆')}</span>
+              <span>${esc(s.awardedTo)} wins +${m.points || 10} pts ${m.rewardEmoji || ''}</span>
+            </div>` : `
+            <div class="muted" style="font-size:16px">No points awarded this round. Ready for the next one!</div>`}
+
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:28px">
+            ${isHost ? `
+              <button class="btn gold" onclick="openLeaderboard()">📊 Show Animated Leaderboard</button>
+              <button class="btn" onclick="nextQuestion()">${isLast ? '🏆 Grand Finale Podium →' : 'Next Question →'}</button>
+            ` : `<span class="pill-btn">⏳ Waiting for host to continue…</span>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderLeaderboard() {
+  const list = getSortedPlayers();
+  const s = roomData.state || {};
+  const m = roomData.meta || {};
+  const isHost = role === 'host';
+  const isLast = s.questionIndex + 1 >= s.total;
+  const key = 'leaderboard_' + role;
+  const ROW_H = 78;
+
+  if (lastScreenKey !== key) {
+    lastScreenKey = key;
+    lbRowNodes = {};
+    appEl.innerHTML = `
+      <div class="shell">
+        ${headerHTML()}
+        <div class="lb-wrap">
+          <div class="eyebrow">LIVE STANDINGS</div>
+          <h1 class="h1-hero" style="font-size:clamp(34px,5.5vw,58px);margin:8px 0 4px">Leaderboard<span class="grad-text">.</span></h1>
+          <p class="muted">${m.rewardEmoji ? `${m.rewardEmoji} = ${m.rewardName || 'Rewards'} won · ` : ''}Watch the ranks climb live!</p>
+          <div id="lbTrack" class="lb-track"></div>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px">
+            ${isHost ? `
+              <button class="btn secondary" onclick="updateState({phase:roomData.state.returnPhase||'question'})">← Back</button>
+              <button class="btn" onclick="continueFromLeaderboard()">${s.returnPhase === 'reveal' ? (isLast ? '🏆 Grand Finale →' : 'Next Question →') : 'Resume Round →'}</button>
+            ` : `<span class="pill-btn">Next round coming up…</span>`}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const track = $('#lbTrack');
+  if (!track) return;
+  const maxScore = Math.max(1, ...list.map(([, p]) => p.score || 0));
+  track.style.height = Math.max(80, list.length * ROW_H) + 'px';
+
+  // Phase 1: Mount rows at their previous rank (so they smoothly slide to new rank!)
+  list.forEach(([id, p], newIdx) => {
+    let row = lbRowNodes[id];
+    const oldIdx = prevRankMap[id] !== undefined ? prevRankMap[id] : newIdx;
+    const delta = oldIdx - newIdx; // positive = moved UP!
+    const deltaHTML = delta > 0
+      ? `<span class="lb-delta up">▲ +${delta}</span>`
+      : delta < 0
+        ? `<span class="lb-delta down">▼ ${delta}</span>`
+        : `<span class="lb-delta same">—</span>`;
+
+    if (!row) {
+      row = lbRowNodes[id] = document.createElement('div');
+      row.className = 'lb-row';
+      row.style.transform = `translateY(${oldIdx * ROW_H}px)`;
+      row.innerHTML = `
+        <div class="lb-fill" style="width:0%"></div>
+        <div class="lb-content">
+          <div class="lb-rank"></div>
+          <div class="lb-av"></div>
+          <div class="lb-name-col"><div class="lb-name"></div><div class="lb-badges"></div></div>
+          <div class="lb-delta-slot"></div>
+          <div class="lb-score"></div>
+        </div>`;
+      track.appendChild(row);
+      row.getBoundingClientRect(); // force reflow before transition
+    }
+
+    row.classList.toggle('rank-1', newIdx === 0 && (p.score || 0) > 0);
+    row.classList.toggle('is-me', id === playerId);
+    row.querySelector('.lb-rank').textContent = ['🥇', '🥈', '🥉'][newIdx] || `#${newIdx + 1}`;
+    row.querySelector('.lb-av').textContent = p.avatar || '⚡';
+    row.querySelector('.lb-name').textContent = p.name;
+    row.querySelector('.lb-badges').textContent = m.rewardEmoji
+      ? `${m.rewardEmoji.repeat(Math.min(p.wins || 0, 8))} ${p.wins || 0} ${m.rewardName || ''}`
+      : `${p.wins || 0} correct`;
+    row.querySelector('.lb-delta-slot').innerHTML = deltaHTML;
+    row.querySelector('.lb-score').innerHTML = `${p.score || 0}<small> pts</small>`;
+
+    requestAnimationFrame(() => {
+      row.style.transform = `translateY(${newIdx * ROW_H}px)`;
+      row.querySelector('.lb-fill').style.width = `${Math.max(8, ((p.score || 0) / maxScore) * 100)}%`;
+    });
+  });
+}
+
+function renderEnd() {
+  lastScreenKey = 'end';
+  const list = getSortedPlayers();
+  const m = roomData.meta || {};
+  const top3 = [list[1], list[0], list[2]]; // 2nd, 1st, 3rd layout
+
+  appEl.innerHTML = `
+    <div class="shell">
+      ${headerHTML()}
+      <div class="lb-wrap">
+        <div class="eyebrow">THAT'S A WRAP · FINAL PODIUM</div>
+        <h1 class="h1-hero" style="font-size:clamp(36px,6vw,68px);margin:8px 0">GAME <span class="grad-text">OVER!</span></h1>
+        <p class="muted">Grand Prize: <b style="color:var(--gold)">${esc(m.grandPrize || 'Grand Prize 🎁')}</b></p>
+
+        <div class="podium">
+          ${top3.map((entry, idx) => {
+            const place = idx === 1 ? 1 : idx === 0 ? 2 : 3;
+            const medal = place === 1 ? '👑' : place === 2 ? '🥈' : '🥉';
+            if (!entry) return `<div class="pod-col p${place}" style="opacity:.3"><div class="pod-avatar">${medal}</div><div class="tiny">—</div></div>`;
+            const [, p] = entry;
+            return `
+              <div class="pod-col p${place}">
+                <div style="font-size:26px;margin-bottom:4px">${medal}</div>
+                <div class="pod-avatar">${esc(p.avatar || '⚡')}</div>
+                <div class="pod-name">${esc(p.name)}</div>
+                <div class="pod-pts">${p.score || 0} pts</div>
+                <div class="tiny" style="margin-top:4px">${m.rewardEmoji ? m.rewardEmoji.repeat(Math.min(p.wins || 0, 6)) : ''}</div>
+              </div>`;
+          }).join('')}
+        </div>
+
+        <div class="panel" style="max-width:740px;margin:0 auto;text-align:left">
+          <div class="eyebrow" style="margin-bottom:10px">FULL STANDINGS</div>
+          ${list.map(([, p], i) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line)">
+              <b style="width:32px;font-family:'Space Grotesk'">${['🥇','🥈','🥉'][i] || '#'+(i+1)}</b>
+              <span style="font-size:20px">${esc(p.avatar || '⚡')}</span>
+              <span style="flex:1;font-weight:700">${esc(p.name)}</span>
+              <span class="tiny">${m.rewardEmoji ? m.rewardEmoji.repeat(Math.min(p.wins || 0, 5)) : ''}</span>
+              <b style="font-family:'Space Grotesk';color:var(--gold)">${p.score || 0} pts</b>
+            </div>`).join('')}
+        </div>
+
+        ${role === 'host' ? `
+          <div style="margin-top:24px;display:flex;gap:10px;justify-content:center">
+            <button class="btn gold" onclick="launchConfetti(1.8);playSound('finale')">🎉 Celebrate Again</button>
+            <button class="btn secondary" onclick="renderHostSetup()">＋ New Game</button>
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+/* ============================================================================
+   MODAL: BUILT-IN FIREBASE + GITHUB PAGES SETUP GUIDE
+   ============================================================================ */
+function openSetupGuide() {
+  $('#modalTitle').textContent = '🚀 Firebase + GitHub Pages Setup (5 Mins)';
+  $('#modalBody').innerHTML = `
+    <div class="step-box"><b>1. Paste your 5 Firebase keys:</b> Open <code>index.html</code> in any text editor, find <code>FIREBASE_CONFIG</code> near the top of the <code>&lt;script&gt;</code>, and replace the 5 <code>"PASTE_HERE"</code> values from Firebase Console → Project Settings → Your Apps → Web App.</div>
+    <div class="step-box"><b>2. Check Firebase Realtime Database Rules:</b> In Firebase Console → Build → Realtime Database → Rules, make sure <code>.read</code> and <code>.write</code> are set to <code>true</code> for your event (or under <code>"rooms"</code>) and click <b>Publish</b>.</div>
+    <div class="step-box"><b>3. Upload to your GitHub Repository:</b> Open your GitHub repo → click <b>Add file → Upload files</b> → drag in <code>index.html</code> and <code>host.html</code> → click <b>Commit changes</b>.</div>
+    <div class="step-box"><b>4. Turn on GitHub Pages:</b> In your repo, go to <b>Settings → Pages</b> → under Build and deployment, select <b>Deploy from a branch</b> → choose <code>main</code> and <code>/ (root)</code> → click <b>Save</b>. Wait ~1 minute for your live link!</div>
+    <div class="step-box"><b>5. Your Two Separate Links:</b><br>
+      • <b>Host ONLY (Create Room):</b> <code>https://YOUR-USERNAME.github.io/YOUR-REPO/host.html</code><br>
+      • <b>Players ONLY (Join Room):</b> <code>https://YOUR-USERNAME.github.io/YOUR-REPO/</code><br>
+      <span class="tiny">Players never see a "Create Room" button! Optional: set <code>OWNER_HOST_PIN</code> in <code>index.html</code> for extra lock.</span>
+    </div>`;
+  $('#modal').classList.add('show');
+}
+
+$('#modalCloseBtn').addEventListener('click', () => $('#modal').classList.remove('show'));
+$('#modal').addEventListener('click', e => { if (e.target === $('#modal')) $('#modal').classList.remove('show'); });
+
+// Keyboard shortcuts for Host on Projector
+window.addEventListener('keydown', e => {
+  if (role !== 'host' || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+  if (e.key === 'f' || e.key === 'F') toggleProjector();
+  if (roomData.state?.phase === 'question' && getActiveBuzzer()) {
+    if (e.key === 'y' || e.key === 'Y') judgeActive(true);
+    if (e.key === 'n' || e.key === 'N') judgeActive(false);
+  }
+});
+
+/* ============================================================================
+   BOOT
+   ============================================================================ */
+window.addEventListener('beforeunload', () => detachListeners());
+renderDemoBar();
+if (IS_LIVE_FIREBASE) {
+  if (isHostUrl()) renderHostSetup();
+  else renderPlayerJoin();
+} else {
+  // Interactive Preview Mode: start on Host Form so user can explore everything immediately
+  renderHostSetup();
+}
+</script>
+</body>
+</html>
